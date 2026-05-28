@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.gh-config/
 
 .venv/
 venv/
@@ -27,4 +28,3 @@ data/
 *.tar
 *.tar.gz
 *.pdf
-
