@@ -14,7 +14,7 @@ Code for two papers on inverse-square distance priors for sparse neural network 
 
 ## Code Availability
 
-This repository contains the cleaned code for reproducing the experiments reported in both papers.
+This repository contains code for reproducing the experiments reported in both papers.
 
 ## Install
 
