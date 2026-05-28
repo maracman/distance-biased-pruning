@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the software and the relevant paper below."
+title: "distance-biased-pruning"
+version: "0.1.0"
+date-released: "2026-05-28"
+license: MIT
+repository-code: "https://github.com/maracman/distance-biased-pruning"
+authors:
+  - family-names: Anderson
+    given-names: Marcus
+preferred-citation:
+  type: software
+  title: "distance-biased-pruning: code for inverse-square distance pruning experiments"
+  authors:
+    - family-names: Anderson
+      given-names: Marcus
+  year: 2026
+  repository-code: "https://github.com/maracman/distance-biased-pruning"
+references:
+  - type: article
+    title: "Inverse-Square Distance Priors Improve Network Pruning at Extreme Sparsity"
+    authors:
+      - family-names: Anderson
+        given-names: Marcus
+    year: 2026
+  - type: article
+    title: "Emergent Connectivity Structure in Inverse-Square Distance Pruning: Bandwidth, Capacity, and Embedding Geometry"
+    authors:
+      - family-names: Anderson
+        given-names: Marcus
+    year: 2026
+
