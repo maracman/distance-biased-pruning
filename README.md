@@ -5,12 +5,14 @@ Code for two papers on inverse-square distance priors for sparse neural network 
 ## Papers
 
 1. **Inverse-Square Distance Priors Improve Network Pruning at Extreme Sparsity**  
+   Preprint forthcoming.  
    ResNet-18 on CIFAR-100, testing distance-biased allocation and distance x magnitude pruning at 98% and 99% sparsity.
 
 2. **Emergent Connectivity Structure in Inverse-Square Distance Pruning: Bandwidth, Capacity, and Embedding Geometry**  
+   Preprint forthcoming.  
    MNIST MLP experiments characterizing how bandwidth, hidden size, and embedding geometry affect the topology produced by the method.
 
-Preprints are forthcoming. Code availability line for both papers:
+Code availability line for both papers:
 
 > Code to reproduce all experiments is available at https://github.com/maracman/distance-biased-pruning.
 
@@ -106,4 +108,3 @@ Paper B key characterization result, clustering range across bandwidths:
 ## License
 
 MIT.
-
