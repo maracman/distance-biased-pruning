@@ -12,9 +12,9 @@ Code for two papers on inverse-square distance priors for sparse neural network 
    Preprint forthcoming.  
    MNIST MLP experiments characterizing how bandwidth, hidden size, and embedding geometry affect the topology produced by the method.
 
-Code availability line for both papers:
+## Code Availability
 
-> Code to reproduce all experiments is available at https://github.com/maracman/distance-biased-pruning.
+This repository contains the cleaned code for reproducing the experiments reported in both papers.
 
 ## Install
 
