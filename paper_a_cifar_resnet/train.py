@@ -1,44 +1,23 @@
 #!/usr/bin/env python3
 """
-Paper 1: Developmental Topology — Structured Sparsity via Bio-Inspired Pruning
+Paper A / Paper 1: Inverse-Square Distance Priors Improve Network Pruning at Extreme Sparsity
 
-Compares pruning strategies for reaching 90%-sparse ResNet-18 on CIFAR-10.
-Key question: can bio-inspired topology (balanced fan-in, no orphaned nodes,
-topology-aware pruning) match or beat standard methods?
+Experiment driver for CIFAR-adapted ResNet-18 channel-pair pruning.
 
-Conditions (7 total):
+Manuscript runs use CIFAR-100, target sparsities 98% and 99%, 200 epochs,
+and seeds 42, 43, 44. The reported six-condition factorial is:
+distance_dev, distance_prior, balanced_dev, balanced_random, random_er, snip.
 
-  Zero-cost pre-pruned:
-    bio_inspired       Balanced random allocation at 90% sparsity. Every output
-                       filter gets exactly k inputs, every input feeds at least
-                       one output. No dead neurons, no orphaned channels.
-    random_er          ERK random sparse (standard baseline). Independent Bernoulli
-                       per weight — can leave neurons disconnected.
-    snip               Gradient-based pruning at init (Lee et al., 2019).
+This script also supports older CIFAR-10 / 90% development and smoke-test
+runs via its CLI defaults. Those runs are useful for quick checks but are not
+the reported Paper A experiments.
 
-  Low-cost (2-3 epoch overhead):
-    bio_quick          Start at 50% with balanced allocation, train 3 epochs,
-                       magnitude-prune to 90% with balanced fan-in. Total extra
-                       FLOPs ≈ 3 epochs × (0.5/0.1 - 1) ≈ 12 epoch-equivalents.
-
-  FLOPs-matched:
-    bio_matched        Same as bio_quick but targets higher final sparsity (≈95%)
-                       so total FLOPs across all epochs equals random_er at 90%.
-                       Tests: can iterative topology discovery compensate for
-                       fewer final connections?
-
-  Expensive baselines:
-    iterative_mag      Start dense, magnitude-prune each epoch to 90% over
-                       first half of training.
-    dense_baseline     No pruning (reference upper bound).
-
-Usage:
-    python paper_a_cifar_resnet/train.py
-    python paper_a_cifar_resnet/train.py --conditions bio_inspired random_er snip bio_quick
+Usage examples:
+    python paper_a_cifar_resnet/train.py --dataset cifar100 --sparsity 0.98 --seeds 3
+    python paper_a_cifar_resnet/train.py --dataset cifar100 --sparsity 0.99 --seeds 3
     python paper_a_cifar_resnet/train.py --quick
-    python paper_a_cifar_resnet/train.py --seeds 3
 
-Results saved to: paper_a_cifar_resnet/results/
+Results saved to: paper_a_cifar_resnet/results/ unless --output_dir is supplied.
 """
 
 import os
@@ -82,11 +61,11 @@ class MaskedConv2d(nn.Conv2d):
 
 
 def make_resnet18_sparse(num_classes=10):
-    """Create ResNet-18 with MaskedConv2d layers (adapted for CIFAR-10)."""
+    """Create ResNet-18 with MaskedConv2d layers for 32x32 CIFAR inputs."""
     import torchvision.models as models
     model = models.resnet18(weights=None, num_classes=num_classes)
 
-    # CIFAR-10 adaptation: 3x3 conv1 with stride 1, no maxpool
+    # CIFAR-style adaptation: 3x3 conv1 with stride 1, no maxpool.
     model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
     model.maxpool = nn.Identity()
 
@@ -320,9 +299,9 @@ def generate_distance_balanced_masks(model, target_density, seed=42, distance_ex
 def generate_random_er_masks(model, target_density, seed=42):
     """Random ERK sparse masks at CHANNEL-PAIR granularity.
 
-    Same granularity as bio_inspired: each selected (out, in) channel pair
+    Same granularity as balanced_random: each selected (out, in) channel pair
     keeps its full spatial kernel (all k_h × k_w weights).  The only
-    difference from bio_inspired is that pairs are sampled i.i.d. Bernoulli
+    difference from balanced_random is that pairs are sampled i.i.d. Bernoulli
     (no balancing, no orphan repair).
 
     This ensures the comparison isolates allocation strategy (balanced vs
@@ -361,7 +340,7 @@ def generate_snip_masks(model, target_density, train_loader, device, seed=42):
     pair. Top-k pairs are kept per layer (ERK budget), and each kept pair
     retains its full spatial kernel.
 
-    This matches the granularity of bio_inspired and random_er so that the
+    This matches the granularity of balanced_random and random_er so that the
     comparison isolates allocation strategy, not sparsity structure.
     """
     densities = compute_erk_densities(model, target_density)
@@ -406,7 +385,7 @@ def generate_snip_masks(model, target_density, train_loader, device, seed=42):
 
 
 # =============================================================================
-# Balanced magnitude pruning (for bio_quick / bio_matched)
+# Balanced magnitude pruning (for balanced_dev / balanced_dev_matched)
 # =============================================================================
 
 def balanced_magnitude_prune(model, target_density):
@@ -658,7 +637,7 @@ def compute_flops_per_sample(model):
     for name, layer in get_masked_layers(model):
         density = 1.0 - layer.sparsity
         k = layer.kernel_size[0] * layer.kernel_size[1]
-        # Output spatial size (CIFAR-10 ResNet-18)
+        # Output spatial size for CIFAR-style 32x32 ResNet-18.
         if layer.in_channels <= 64:
             out_hw = 32
         elif layer.in_channels <= 128:
@@ -728,7 +707,7 @@ def run_condition(condition, model, train_loader, test_loader, epochs, device, s
     print(f"{'='*70}")
 
     TARGET_DENSITY = target_density                         # final keep fraction
-    # Warmup density for bio_quick/matched scales with target so the dense phase
+    # Warmup density for balanced_dev/matched scales with target so the dense phase
     # stays a fixed factor (5x) denser than the final mask across sparsity levels.
     QUICK_INIT_DENSITY = min(0.50, max(TARGET_DENSITY * 5.0, TARGET_DENSITY + 0.05))
     QUICK_PRUNE_EPOCH = 3        # prune to final sparsity after this many epochs
@@ -737,13 +716,13 @@ def run_condition(condition, model, train_loader, test_loader, epochs, device, s
     t0 = time.time()
     prune_callback = None  # called at start of each epoch
 
-    if condition == "bio_inspired":
+    if condition == "balanced_random":
         # Balanced random at target density from the start. Zero cost.
         masks, _ = generate_balanced_masks(model, TARGET_DENSITY, seed=seed)
         for name, layer in get_masked_layers(model):
             layer.apply_mask(masks[name].to(device))
 
-    elif condition == "distance_balanced":
+    elif condition == "distance_prior":
         # Distance-biased balanced allocation at target density. Zero cost.
         # Channels embedded in 1D space; connection probability ~ 1/d^2.
         # Combined with balanced fan-in and orphan repair.
@@ -753,7 +732,7 @@ def run_condition(condition, model, train_loader, test_loader, epochs, device, s
         for name, layer in get_masked_layers(model):
             layer.apply_mask(masks[name].to(device))
 
-    elif condition == "distance_quick":
+    elif condition == "distance_dev":
         # The full bio-inspired developmental method:
         # 1. Start at higher density with distance-biased allocation
         #    (nearby channels more likely to connect — models initial
@@ -772,8 +751,9 @@ def run_condition(condition, model, train_loader, test_loader, epochs, device, s
                       f"(distance × magnitude, alpha=0.5)")
                 distance_magnitude_prune(mdl, TARGET_DENSITY, alpha=0.5)
 
-    elif condition == "bio_quick":
-        # Start balanced at 50%, train 3 epochs, balanced-magnitude prune to 90%
+    elif condition == "balanced_dev":
+        # Start balanced at the warmup density, train 3 epochs, then
+        # balanced-magnitude prune to the requested target density.
         masks, _ = generate_balanced_masks(model, QUICK_INIT_DENSITY, seed=seed)
         for name, layer in get_masked_layers(model):
             layer.apply_mask(masks[name].to(device))
@@ -783,8 +763,8 @@ def run_condition(condition, model, train_loader, test_loader, epochs, device, s
                 print(f"  >>> Pruning to {TARGET_DENSITY:.0%} density (balanced magnitude)")
                 balanced_magnitude_prune(mdl, TARGET_DENSITY)
 
-    elif condition == "bio_matched":
-        # Same as bio_quick but target higher sparsity to match FLOPs budget
+    elif condition == "balanced_dev_matched":
+        # Same as balanced_dev but target higher sparsity to match FLOPs budget
         # Extra FLOPs from 3 epochs at 50% ≈ 3 × (0.5/0.1) = 15 epoch-equivalents
         # Compensate by targeting ~95% sparsity (density=0.05) for remaining epochs
         # So total = 3*5 + 197*1 ≈ 212 epoch-equivalents at 10% density
@@ -931,11 +911,11 @@ def run_condition(condition, model, train_loader, test_loader, epochs, device, s
 # =============================================================================
 
 ALL_CONDITIONS = [
-    "bio_inspired",
-    "distance_balanced",
-    "distance_quick",
-    "bio_quick",
-    "bio_matched",
+    "balanced_random",
+    "distance_prior",
+    "distance_dev",
+    "balanced_dev",
+    "balanced_dev_matched",
     "random_er",
     "snip",
     "iterative_mag",
@@ -1121,14 +1101,14 @@ def run_transfer_experiment(epochs=200, n_seeds=1, device="cuda",
     evaluate on classes 50-99.
 
     Conditions:
-      bio_quick_transfer       - topology + weights from source (balanced mag prune)
-      bio_quick_topo_only      - topology from source, weights reinit (balanced mag prune)
-      distance_quick_transfer  - topology + weights from source (distance × mag prune)
-      distance_quick_topo_only - topology from source, weights reinit (distance × mag prune)
-      bio_quick_direct         - bio_quick end-to-end on target classes only
-      distance_quick_direct    - distance_quick end-to-end on target classes only
-      bio_inspired_direct      - balanced random on target (structure, no selection)
-      distance_balanced_direct - distance-biased balanced on target (structure, no selection)
+      balanced_dev_transfer       - topology + weights from source (balanced mag prune)
+      balanced_dev_topo_only      - topology from source, weights reinit (balanced mag prune)
+      distance_dev_transfer  - topology + weights from source (distance × mag prune)
+      distance_dev_topo_only - topology from source, weights reinit (distance × mag prune)
+      balanced_dev_direct         - balanced_dev end-to-end on target classes only
+      distance_dev_direct    - distance_dev end-to-end on target classes only
+      balanced_random_direct      - balanced random on target (structure, no selection)
+      distance_prior_direct - distance-biased balanced on target (structure, no selection)
       random_er_direct         - random ER on target (baseline)
     """
     if results_dir is None:
@@ -1171,7 +1151,7 @@ def run_transfer_experiment(epochs=200, n_seeds=1, device="cuda",
     print(f"Target classes: 50-99 ({len(target_train)} train, {len(target_test)} test)")
     print(f"Target sparsity: {target_sparsity:.4f}  Epochs: {epochs}  Seeds: {n_seeds}")
 
-    # bio_quick warmup density (same formula as run_condition)
+    # balanced_dev warmup density (same formula as run_condition)
     QUICK_INIT_DENSITY = min(0.50, max(target_density * 5.0, target_density + 0.05))
     QUICK_PRUNE_EPOCH = 3
 
@@ -1190,14 +1170,14 @@ def run_transfer_experiment(epochs=200, n_seeds=1, device="cuda",
         json.dump(config, f, indent=2)
 
     conditions = [
-        "bio_quick_transfer",        # topology + weights from source (mag prune)
-        "bio_quick_topo_only",       # topology from source, reinit (mag prune)
-        "distance_quick_transfer",   # topology + weights from source (dist × mag prune)
-        "distance_quick_topo_only",  # topology from source, reinit (dist × mag prune)
-        "bio_quick_direct",          # bio_quick on target only
-        "distance_quick_direct",     # distance_quick on target only
-        "bio_inspired_direct",       # balanced random on target only
-        "distance_balanced_direct",  # distance-biased balanced on target only
+        "balanced_dev_transfer",        # topology + weights from source (mag prune)
+        "balanced_dev_topo_only",       # topology from source, reinit (mag prune)
+        "distance_dev_transfer",   # topology + weights from source (dist × mag prune)
+        "distance_dev_topo_only",  # topology from source, reinit (dist × mag prune)
+        "balanced_dev_direct",          # balanced_dev on target only
+        "distance_dev_direct",     # distance_dev on target only
+        "balanced_random_direct",       # balanced random on target only
+        "distance_prior_direct",  # distance-biased balanced on target only
         "random_er_direct",          # random ER on target only
     ]
 
@@ -1218,7 +1198,7 @@ def run_transfer_experiment(epochs=200, n_seeds=1, device="cuda",
             torch.manual_seed(seed)
             np.random.seed(seed)
 
-            if cond in ("bio_quick_transfer", "bio_quick_topo_only"):
+            if cond in ("balanced_dev_transfer", "balanced_dev_topo_only"):
                 # --- Phase 1: discover topology on source classes ---
                 print("  Phase 1: Topology discovery on source classes 0-49 (balanced mag)")
                 model_source = make_resnet18_sparse(num_classes=num_classes_per_split).to(device)
@@ -1249,7 +1229,7 @@ def run_transfer_experiment(epochs=200, n_seeds=1, device="cuda",
                 for name, layer in get_masked_layers(model):
                     layer.apply_mask(discovered_masks[name].to(device))
 
-                if cond == "bio_quick_transfer":
+                if cond == "balanced_dev_transfer":
                     src_state = model_source.state_dict()
                     tgt_state = model.state_dict()
                     for k, v in src_state.items():
@@ -1264,7 +1244,7 @@ def run_transfer_experiment(epochs=200, n_seeds=1, device="cuda",
 
                 del model_source
 
-            elif cond in ("distance_quick_transfer", "distance_quick_topo_only"):
+            elif cond in ("distance_dev_transfer", "distance_dev_topo_only"):
                 # --- Phase 1: discover topology on source classes (distance × mag) ---
                 print("  Phase 1: Topology discovery on source classes 0-49 (distance × mag)")
                 model_source = make_resnet18_sparse(num_classes=num_classes_per_split).to(device)
@@ -1297,7 +1277,7 @@ def run_transfer_experiment(epochs=200, n_seeds=1, device="cuda",
                 for name, layer in get_masked_layers(model):
                     layer.apply_mask(discovered_masks[name].to(device))
 
-                if cond == "distance_quick_transfer":
+                if cond == "distance_dev_transfer":
                     src_state = model_source.state_dict()
                     tgt_state = model.state_dict()
                     for k, v in src_state.items():
@@ -1312,25 +1292,25 @@ def run_transfer_experiment(epochs=200, n_seeds=1, device="cuda",
 
                 del model_source
 
-            elif cond == "bio_quick_direct":
+            elif cond == "balanced_dev_direct":
                 model = make_resnet18_sparse(num_classes=num_classes_per_split).to(device)
                 masks, _ = generate_balanced_masks(model, QUICK_INIT_DENSITY, seed=seed)
                 for name, layer in get_masked_layers(model):
                     layer.apply_mask(masks[name].to(device))
 
-            elif cond == "distance_quick_direct":
+            elif cond == "distance_dev_direct":
                 model = make_resnet18_sparse(num_classes=num_classes_per_split).to(device)
                 masks, _ = generate_distance_balanced_masks(model, QUICK_INIT_DENSITY, seed=seed)
                 for name, layer in get_masked_layers(model):
                     layer.apply_mask(masks[name].to(device))
 
-            elif cond == "bio_inspired_direct":
+            elif cond == "balanced_random_direct":
                 model = make_resnet18_sparse(num_classes=num_classes_per_split).to(device)
                 masks, _ = generate_balanced_masks(model, target_density, seed=seed)
                 for name, layer in get_masked_layers(model):
                     layer.apply_mask(masks[name].to(device))
 
-            elif cond == "distance_balanced_direct":
+            elif cond == "distance_prior_direct":
                 model = make_resnet18_sparse(num_classes=num_classes_per_split).to(device)
                 masks, _ = generate_distance_balanced_masks(model, target_density, seed=seed)
                 for name, layer in get_masked_layers(model):
@@ -1344,12 +1324,12 @@ def run_transfer_experiment(epochs=200, n_seeds=1, device="cuda",
 
             # --- Set up pruning callback for *_direct conditions that need it ---
             prune_callback = None
-            if cond == "bio_quick_direct":
+            if cond == "balanced_dev_direct":
                 def prune_callback(epoch, mdl, _d=target_density):
                     if epoch == QUICK_PRUNE_EPOCH + 1:
                         print(f"  >>> Pruning to {_d:.4f} density (balanced magnitude)")
                         balanced_magnitude_prune(mdl, _d)
-            elif cond == "distance_quick_direct":
+            elif cond == "distance_dev_direct":
                 def prune_callback(epoch, mdl, _d=target_density):
                     if epoch == QUICK_PRUNE_EPOCH + 1:
                         print(f"  >>> Pruning to {_d:.4f} density (distance × magnitude)")
@@ -1455,7 +1435,7 @@ def run_condition_inner(condition, model, train_loader, test_loader,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Paper 1: Pruning strategy comparison (ResNet-18 / CIFAR-10)")
+        description="Paper 1: Pruning strategy comparison (CIFAR ResNet-18)")
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--device", default="auto")
@@ -1467,7 +1447,7 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", default=None)
     parser.add_argument("--dataset", default="cifar10",
                         choices=["cifar10", "cifar100"],
-                        help="Training dataset")
+                        help="Training dataset. Paper A reported runs use cifar100; cifar10 is a legacy smoke/dev default.")
     parser.add_argument("--sparsity", type=float, default=0.90,
                         help="Target sparsity (fraction of weights pruned), e.g. 0.98")
     parser.add_argument("--transfer", action="store_true",
@@ -1483,7 +1463,7 @@ if __name__ == "__main__":
         else:
             device = "cpu"
 
-    print(f"Paper 1 — Pruning Strategy Comparison (ResNet-18 / CIFAR-10)")
+    print(f"Paper 1 — Pruning Strategy Comparison (CIFAR ResNet-18)")
     print(f"Device: {device}")
     if device == "cuda":
         print(f"GPU: {torch.cuda.get_device_name()}")
@@ -1496,7 +1476,7 @@ if __name__ == "__main__":
         )
     elif args.quick:
         run_experiment(
-            conditions=args.conditions or ["bio_inspired", "random_er", "snip"],
+            conditions=args.conditions or ["balanced_random", "random_er", "snip"],
             epochs=20, n_seeds=1, device=device,
             seed_start=args.seed_start, results_dir=args.output_dir,
             dataset=args.dataset, target_sparsity=args.sparsity,

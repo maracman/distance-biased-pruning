@@ -10,7 +10,9 @@ Code for two papers on inverse-square distance priors for sparse neural network 
 
 2. **Emergent Connectivity Structure in Inverse-Square Distance Pruning: Bandwidth, Capacity, and Embedding Geometry**  
    Preprint forthcoming.  
-   MNIST MLP experiments characterizing how bandwidth, hidden size, and embedding geometry affect the topology produced by the method.
+   MNIST single-hidden-layer MLP experiments characterizing how bandwidth, hidden size, and embedding geometry affect the topology produced by the method.
+
+Paper A's reported results are CIFAR-100 runs. The training CLI still supports CIFAR-10 quick/development runs, but those outputs are not the reported Paper A experiments. Paper B's main results use downsample-then-upsample MNIST bandwidth control at 98% sparsity; the separate `bio_developmental_comparison.py` script uses patch-sampled MNIST at 90% sparsity and should be treated as a secondary comparison.
 
 ## Code Availability
 
@@ -59,7 +61,7 @@ python paper_b_topology_mnist/bio_developmental_comparison.py --quick --device a
 ```text
 distance-biased-pruning/
 ├── paper_a_cifar_resnet/      # Paper A ResNet-18 / CIFAR experiments
-├── paper_b_topology_mnist/    # Paper B MNIST topology-characterization experiments
+├── paper_b_topology_mnist/    # Paper B MNIST single-hidden-layer MLP experiments
 ├── shared/                    # Shared topology, model, training, and analysis utilities
 └── tests/                     # Unit tests for topology generation, pruning, and metrics
 ```
@@ -83,6 +85,7 @@ Paper B key characterization result, clustering range across bandwidths:
 | --- | ---: | ---: | ---: | ---: |
 | `random_prune` | 0.000 | 0.000 | 0.000 | 0.000 |
 | `distance_only` | 0.000 | 0.000 | 0.000 | 0.000 |
+| `distance_only_2d` | 0.000 | 0.000 | 0.000 | 0.000 |
 | `magnitude_only` | 0.002 | 0.025 | 0.074 | 0.105 |
 | `bio_inspired` | 0.001 | 0.018 | 0.067 | 0.113 |
 | `bio_inspired_2d` | 0.003 | 0.017 | 0.078 | 0.148 |

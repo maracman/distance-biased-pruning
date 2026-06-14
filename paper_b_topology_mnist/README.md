@@ -2,7 +2,7 @@
 
 Reproduction code for **Emergent Connectivity Structure in Inverse-Square Distance Pruning: Bandwidth, Capacity, and Embedding Geometry**.
 
-The main script characterizes topology across bandwidth, hidden size, pruning method, and embedding geometry using MNIST MLPs at 98% sparsity.
+The main script characterizes topology across bandwidth, hidden size, pruning method, and embedding geometry using MNIST single-hidden-layer MLPs (`784 -> H -> 10`) at 98% sparsity. Bandwidth in the main experiment is controlled by downsampling each MNIST image to 4x4, 7x7, 14x14, or 28x28 effective resolution, then upsampling back to 28x28 so input dimensionality stays fixed.
 
 ## Commands
 
@@ -29,7 +29,7 @@ python train.py \
   --device auto
 ```
 
-The secondary `bio_developmental_comparison.py` script runs the checkpointed 90% sparsity comparison between two-phase bio-developmental topology and lambda-mixture baselines:
+The secondary `bio_developmental_comparison.py` script is a separate 90% sparsity comparison between two-phase bio-developmental topology and lambda-mixture baselines. It uses patch-sampled MNIST exposures and a fixed `[784, 256, 10]` architecture, so it should not be mixed with the main downsample-upsample / hidden-size-sweep results:
 
 ```bash
 python bio_developmental_comparison.py --quick --device auto
@@ -60,7 +60,7 @@ Clustering coefficient range across bandwidths:
 | --- | ---: | ---: | ---: | ---: |
 | `random_prune` | 0.000 | 0.000 | 0.000 | 0.000 |
 | `distance_only` | 0.000 | 0.000 | 0.000 | 0.000 |
+| `distance_only_2d` | 0.000 | 0.000 | 0.000 | 0.000 |
 | `magnitude_only` | 0.002 | 0.025 | 0.074 | 0.105 |
 | `bio_inspired` | 0.001 | 0.018 | 0.067 | 0.113 |
 | `bio_inspired_2d` | 0.003 | 0.017 | 0.078 | 0.148 |
-

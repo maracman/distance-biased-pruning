@@ -4,11 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 conditions=(
-  distance_quick
-  bio_quick
-  distance_balanced
+  distance_dev
+  balanced_dev
+  distance_prior
   random_er
-  bio_inspired
+  balanced_random
   snip
 )
 

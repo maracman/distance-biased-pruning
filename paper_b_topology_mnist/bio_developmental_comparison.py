@@ -2,11 +2,14 @@
 """
 Paper 2 — Bio-Inspired Topology vs λ-Sweep Comparison
 
-Tests whether the Bio-Inspired developmental topology (Paper 1) outperforms
-the best simple λ-mixture topology under Paper 2's bandwidth-constrained
-framework. The λ-sweep maps the simple topology landscape; this script asks
-whether richer, hierarchically-modular structure can beat that landscape's
-optimum.
+Secondary comparison script. This is separate from the main Paper B
+characterization run reported in the manuscript.
+
+The main Paper B run uses downsample-then-upsample MNIST bandwidth control,
+a hidden-size sweep, and final 98% sparsity. This script instead uses
+patch-sampled MNIST exposures, a fixed [784, 256, 10] architecture, and
+90% sparsity to compare a two-phase bio-developmental topology against
+lambda-mixture baselines.
 
 Conditions (all at 90% sparsity, [784, 256, 10] architecture):
   1. bio_developmental  — Inverse-square distance → 10 connectivity-preserving

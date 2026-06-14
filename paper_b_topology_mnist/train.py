@@ -7,13 +7,17 @@ automatically discover different connectivity structures depending on input
 bandwidth — and are those emergent structures optimal and transferable?
 
 Design:
-  - Same MLP architecture, starts fully connected
+  - Same single-hidden-layer MLP architecture, starts fully connected
   - 4 bandwidth conditions (4×4, 7×7, 14×14, 28×28 MNIST)
-  - 4 pruning methods (2×2 factorial: {no spatial, spatial} × {no training, training})
+  - Main manuscript uses 6 pruning methods:
+    2×2 factorial ({no spatial, spatial} × {no training, training})
+    plus 2D-pixel embedding variants of the spatial-prior methods
       1. random_prune       — random removal, balanced fan-in (null model)
       2. distance_only      — prune by proximity (α=0.0), no training signal
       3. magnitude_only     — train, prune by magnitude (α=1.0)
       4. bio_inspired       — train, prune by α×magnitude + (1-α)×proximity
+      5. distance_only_2d   — distance_only using 2D pixel positions for input layer
+      6. bio_inspired_2d    — bio_inspired using 2D pixel positions for input layer
   - Progressive developmental schedule: full → 50% → 75% → 90% → 95% → 98%
       with 3-epoch retraining between each pruning stage.  This lets weight
       magnitudes differentiate across intermediate sparsities so the training
@@ -25,9 +29,9 @@ Design:
   - 3 seeds
 
 Usage:
-    python paper2_run.py                          # Full experiment
-    python paper2_run.py --quick                  # Smoke test
-    python paper2_run.py --phase main             # Main experiment only
+    python train.py --phase main --hidden_sizes 64,128,256,512 --include_2d_variants
+    python train.py --quick                       # Smoke test
+    python train.py --phase main                  # Main experiment only, default H=256 and 1D methods
     python paper2_run.py --phase transfer         # Transfer only (needs main results)
 
 Self-contained — only requires torch, torchvision, numpy.
