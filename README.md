@@ -72,11 +72,11 @@ Paper A main result, CIFAR-100 ResNet-18, mean accuracy over 3 seeds:
 
 | Condition | 98% sparsity | 99% sparsity | Orphans/dead at 99%, seed 42 |
 | --- | ---: | ---: | ---: |
-| `distance_quick` | 69.74 +/- 0.03 | 65.95 +/- 0.20 | 0 / 0 |
-| `bio_quick` | 69.64 +/- 0.20 | 65.79 +/- 0.26 | 0 / 0 |
-| `distance_balanced` | 69.22 +/- 0.30 | 65.08 +/- 0.24 | 0 / 0 |
+| `distance_dev` | 69.74 +/- 0.03 | 65.95 +/- 0.20 | 0 / 0 |
+| `balanced_dev` | 69.64 +/- 0.20 | 65.79 +/- 0.26 | 0 / 0 |
+| `distance_prior` | 69.22 +/- 0.30 | 65.08 +/- 0.24 | 0 / 0 |
 | `random_er` | 69.09 +/- 0.16 | 64.55 +/- 0.60 | 162 / 255 |
-| `bio_inspired` | 69.00 +/- 0.19 | 64.61 +/- 0.32 | 0 / 0 |
+| `balanced_random` | 69.00 +/- 0.19 | 64.61 +/- 0.32 | 0 / 0 |
 | `snip` | 68.52 +/- 0.16 | 64.10 +/- 0.34 | 1141 / 1469 |
 
 Paper B key characterization result, clustering range across bandwidths:
